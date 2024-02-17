@@ -1,8 +1,17 @@
 // app/profile/[handle]/page.tsx
 'use client'
 import {
-    useProfile, usePublications, Profile, LimitType, PublicationType
+    useProfile,
+    usePublications,
+    Profile,
+    LimitType,
+    PublicationType,
+    useLogin,
+    useProfiles,
+    useFollow
 } from '@lens-protocol/react-web'
+import { useWeb3Modal } from '@web3modal/wagmi/react'
+import { useAccount } from 'wagmi'
 
 export default function Profile({ params: { handle } }) {
     const namespace = handle.split('.')[1]
@@ -10,8 +19,19 @@ export default function Profile({ params: { handle } }) {
     let { data: profile, loading } = useProfile({
         forHandle: `${namespace}/${handle}`
     })
-    if (loading) return <p className="p-14">Loading ...</p>
+    const { open } = useWeb3Modal()
+    const { address, isConnected } = useAccount()
+    const { execute: login, data } = useLogin()
+    const { execute: follow } = useFollow();
+    const { data: ownedProfiles } = useProfiles({
+        where: {
+            ownedBy: [address || ''],
+        },
+    })
 
+    if (!profile) return null
+
+    if (loading) return <p className="p-14">Loading ...</p>
     return (
         <div>
             <div className="p-14">
@@ -24,6 +44,36 @@ export default function Profile({ params: { handle } }) {
                             className='rounded-xl'
                             src={profile.metadata.picture.optimized?.uri}
                         />
+                    )
+                }
+                {
+                    !isConnected && (
+                        <button
+                            className='border border-zinc-600 rounded px-4 py-2 mt-4 mb-6'
+                            onClick={() => open()}>
+                            Connect Wallet
+                        </button>
+                    )
+                }
+                {
+                    !data && ownedProfiles?.length && isConnected && (
+                        <button
+                            className='border border-zinc-600 rounded px-4 py-2 mt-4 mb-6'
+                            onClick={() => login({
+                                address: address || '',
+                                profileId: ownedProfiles[ownedProfiles.length - 1].id
+                            })}>
+                            Login with Lens
+                        </button>
+                    )
+                }
+                {
+                    data && profile.operations.canFollow !== 'NO' && (
+                        <button
+                            className='border border-zinc-600 rounded px-4 py-2 mt-4 mb-6'
+                            onClick={() => profile ? follow({ profile: profile }) : null}>
+                            Follow
+                        </button>
                     )
                 }
                 <h1 className="text-3xl my-3">{profile?.handle?.localName}.{profile?.handle?.namespace}</h1>
